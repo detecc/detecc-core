@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/detecc/detecctor/bot/api"
 	"github.com/detecc/detecctor/cache"
 	"github.com/detecc/detecctor/database"
 	"github.com/detecc/detecctor/server/plugin"
@@ -22,14 +23,15 @@ func (e HardwareMonitorPlugin) GetCmdName() string {
 	return "/get-hw-status"
 }
 
-func (e HardwareMonitorPlugin) Response(payload shared.Payload) shared.Reply {
+func (e HardwareMonitorPlugin) Response(payload shared.Payload) api.Reply {
+	replyBuilder := api.NewReplyBuilder()
 	log.Println(payload)
 	var content = "An unexpected error occurred."
 
 	chatId, isFound := cache.Memory().Get(payload.Id)
 	if !isFound {
 		log.Println("not found")
-		return shared.Reply{}
+		return replyBuilder.Build()
 	}
 
 	if payload.Success {
@@ -42,11 +44,7 @@ func (e HardwareMonitorPlugin) Response(payload shared.Payload) shared.Reply {
 		content = content + fmt.Sprintf("Total memory: %.2f MB\n", hwInfo["mem-total"])
 	}
 
-	return shared.Reply{
-		ChatId:    chatId.(int64),
-		ReplyType: shared.TypeMessage,
-		Content:   content,
-	}
+	return replyBuilder.TypeMessage().ForChat(chatId.(string)).WithContent(content).Build()
 }
 
 func (e HardwareMonitorPlugin) Execute(args ...string) ([]shared.Payload, error) {
@@ -58,14 +56,8 @@ func (e HardwareMonitorPlugin) Execute(args ...string) ([]shared.Payload, error)
 			continue
 		}
 
-		payloads = append(payloads, shared.Payload{
-			Id:             "",
-			ServiceNodeKey: key.ServiceNodeKey,
-			Data:           nil,
-			Command:        e.GetCmdName(),
-			Success:        true,
-			Error:          "",
-		})
+		payload := shared.NewPayload(shared.ForClient(key.ServiceNodeKey), shared.ForCommand(e.GetCmdName()), shared.Successful())
+		payloads = append(payloads, payload)
 	}
 	log.Println(args)
 	return payloads, nil
